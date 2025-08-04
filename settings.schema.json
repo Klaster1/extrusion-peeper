@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "$schema": {
+      "default": "./settings.schema.json",
+      "type": "string"
+    },
+    "login": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Your Tapo user login. Only used for to get sensor data."
+    },
+    "password": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Your Tapo user password. Only used for to get sensor data."
+    },
+    "token": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Your Tapo user token. Only used for to get sensor data. If you don't have it, leave it empty."
+    },
+    "cameraHost": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The host of your camera. Example: 192.168.1.10. Without this, the camera will not work."
+    },
+    "cameraLogin": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The login for your camera. Without this, the camera will not work."
+    },
+    "cameraPassword": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The password for your camera. Without this, the camera will not work."
+    },
+    "temperatureSensorDeviceId": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The ID of the temperature sensor device. Filled automatically when you select a sensor in UI."
+    },
+    "port": {
+      "anyOf": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The port to serve the web UI from. Default is 2024."
+    },
+    "ffmpegFlags": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The flags to pass to FFmpeg. Leave empty to use defaults. You can tweak these to adjust quality or transform the output, read ffmpeg documentation for more details or ask ChatGPT to generate them for you."
+    }
+  },
+  "required": [
+    "$schema",
+    "login",
+    "password",
+    "token",
+    "cameraHost",
+    "cameraLogin",
+    "cameraPassword",
+    "temperatureSensorDeviceId"
+  ],
+  "additionalProperties": false
+}
