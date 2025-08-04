@@ -82,7 +82,9 @@ app.post(
 const makeServer = (port: number) =>
   new Observable((subscriber) => {
     const server = app.listen(port);
-    console.log(`Server is running on port ${port}`);
+    console.log(
+      `You can now peep at extrusions over at: http://localhost:${port}`
+    );
 
     return () => {
       server.close();
