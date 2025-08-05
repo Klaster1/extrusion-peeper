@@ -38,3 +38,8 @@ These are devices that were confirmed to work:
 # Contributions
 
 These are very welcome, it's obvious I didn't pay much attention to how easy to use this is or whether it's compatible with many devices.
+
+# Extras
+
+1. [Awesome, clean mount for a C110 by HarryKlynn](https://makerworld.com/en/models/180019-p1p-p1s-tapo-c110-v2-internal-camera-mount)
+2. [USB to 9v cable to power C110 from internal USB](https://www.aliexpress.com/item/1005005874548376.html?)
