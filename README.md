@@ -4,7 +4,7 @@ Your printer camera shoots at 0.3fps 1mpx, preventing you from obsessing over ev
 
 On a more serious note, Extrusion Peeper does two things:
 
-1. Relays RTSP LAN camera stream to a web page that you can plug into your slicer, like Orca Slicer.
+1. Relays RTSP LAN camera stream to a web page that you can plug into Orca Slicer.
 2. Gives an optional overlay with a sensor temp.
 
 ![Screenshot of how this works](screenshot.png)
@@ -34,6 +34,11 @@ These are devices that were confirmed to work:
 
 1. Tapo T310
 2. Tapo T315
+
+## Slicer
+
+1. Orca Slicer - works.
+2. Bambu Studio - not compatible, there's no setting to set camera stream page URL.
 
 # Contributions
 
