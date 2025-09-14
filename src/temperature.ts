@@ -1,4 +1,5 @@
 import {
+  catchError,
   distinctUntilChanged,
   filter,
   map,
@@ -89,6 +90,10 @@ export const temperatureDevices$ = tapoFullCredentials$.pipe(
         selected: device.device_id === currentSensorId,
       })
     );
+  }),
+  catchError((e) => {
+    console.error("Error fetching temperature devices:", e);
+    return of([]);
   })
 );
 
