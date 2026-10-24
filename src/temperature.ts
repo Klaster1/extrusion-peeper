@@ -2,17 +2,26 @@ import {
   catchError,
   distinctUntilChanged,
   filter,
+  firstValueFrom,
   map,
   merge,
   Observable,
   of,
+  retry,
   shareReplay,
+  skip,
   switchMap,
+  take,
+  throwError,
   timer,
   withLatestFrom,
 } from "rxjs";
-import { tapoFullCredentials$ } from "./credentials.ts";
-import { listDevices, loginDevice } from "./tapo-api.ts";
+import {
+  refreshTapoToken,
+  tapoFullCredentials$,
+  tapoToken$,
+} from "./credentials.ts";
+import { listDevices, loginDevice, TapoTokenExpiredError } from "./tapo-api.ts";
 import type { TapoCredentials } from "./credentials.ts";
 import { settings$ } from "./settings.ts";
 
@@ -38,8 +47,24 @@ import { settings$ } from "./settings.ts";
 //   return temperatureSensor?.current_temp;
 // };
 
+const listDevices$ = tapoToken$.pipe(
+  take(1),
+  switchMap((token) => listDevices(token)),
+  retry({
+    count: 1,
+    delay: (e) => {
+      if (!(e instanceof TapoTokenExpiredError)) {
+        return throwError(() => e);
+      }
+      refreshTapoToken();
+      // The first value is the replayed stale token
+      return tapoToken$.pipe(skip(1), take(1));
+    },
+  })
+);
+
 const getAllTemperatureDevices = async (credentials: TapoCredentials) => {
-  const devices = await listDevices(credentials.token);
+  const devices = await firstValueFrom(listDevices$);
   const hubs = devices.filter(
     (device) => device.deviceType === "SMART.TAPOHUB"
   );

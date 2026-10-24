@@ -163,6 +163,14 @@ export interface TapoErrorResponse {
   msg: string;
 }
 
+const TOKEN_EXPIRED_CODE = -20651;
+
+export class TapoTokenExpiredError extends Error {
+  constructor() {
+    super("Tapo cloud token expired");
+  }
+}
+
 export const getTapoCloudToken = async (
   email: string,
   password: string
@@ -210,6 +218,9 @@ export const listDevices = async (
   });
 
   const data: TapoDeviceListResponse = await response.json();
+  if ((data as Partial<TapoErrorResponse>).error_code === TOKEN_EXPIRED_CODE) {
+    throw new TapoTokenExpiredError();
+  }
   checkError(data);
 
   return data.result.deviceList;

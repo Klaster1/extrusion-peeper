@@ -28,17 +28,6 @@
       ],
       "description": "Your Tapo user password. Only used for to get sensor data."
     },
-    "token": {
-      "anyOf": [
-        {
-          "type": "string"
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "Your Tapo user token. Only used for to get sensor data. If you don't have it, leave it empty."
-    },
     "cameraHost": {
       "anyOf": [
         {
@@ -113,7 +102,6 @@
     "$schema",
     "login",
     "password",
-    "token",
     "cameraHost",
     "cameraLogin",
     "cameraPassword",
