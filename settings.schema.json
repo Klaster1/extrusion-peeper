@@ -82,20 +82,6 @@
         }
       ],
       "description": "The port to serve the web UI from. Default is 2024."
-    },
-    "ffmpegFlags": {
-      "anyOf": [
-        {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "The flags to pass to FFmpeg. Leave empty to use defaults. You can tweak these to adjust quality or transform the output, read ffmpeg documentation for more details or ask ChatGPT to generate them for you."
     }
   },
   "required": [

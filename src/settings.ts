@@ -1,10 +1,13 @@
-import { promises as fs } from "fs";
+import { promises as fs, watch } from "fs";
 import path from "path";
+import { isDeepStrictEqual } from "util";
 import {
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  EMPTY,
   from,
-  merge,
   Observable,
-  share,
   shareReplay,
   startWith,
   switchMap,
@@ -20,12 +23,11 @@ const SettingsSchema = z.object({
   cameraPassword: z.string().nullable(),
   temperatureSensorDeviceId: z.string().nullable(),
   port: z.number().nullable(),
-  ffmpegFlags: z.array(z.string()).nullable(),
 });
 
 export type Settings = z.infer<typeof SettingsSchema>;
 
-const DEFAULT_SETTINGS: Settings = {
+export const DEFAULT_SETTINGS: Settings = {
   $schema: "./settings.schema.json",
   login: null,
   password: null,
@@ -34,77 +36,71 @@ const DEFAULT_SETTINGS: Settings = {
   cameraPassword: null,
   temperatureSensorDeviceId: null,
   port: 2024,
-  ffmpegFlags: [
-    "-q",
-    "1", // Maximum quality
-    "-qmin",
-    "1", // Minimum quantizer
-    "-qmax",
-    "1", // Maximum quantizer (lower = better quality)
-    "-qdiff",
-    "1", // Max difference between quantizers
-    "-mbd",
-    "2", // Macroblock decision algorithm (2 = best)
-    "-b:v",
-    "10000k",
-  ],
 };
 
 const SETTINGS_FILE = path.join(import.meta.dirname, "..", "settings.json");
 
-export async function getSettings(): Promise<Settings> {
+/** Reads the settings, creating the file with defaults if it's missing. Throws if the file is invalid. */
+export async function loadSettings(file = SETTINGS_FILE): Promise<Settings> {
   try {
-    await fs.access(SETTINGS_FILE);
-  } catch (error: any) {
-    if (error.code === "EACCES") {
-      console.error("Permission denied to access the settings file.");
-      process.exit(1);
-    }
-    fs.writeFile(
-      SETTINGS_FILE,
-      JSON.stringify(DEFAULT_SETTINGS, null, 2),
-      "utf-8"
-    );
-    console.log("Settings file created with default values.");
-  }
-  try {
-    const data = await fs.readFile(SETTINGS_FILE, "utf-8");
-    const parsed = JSON.parse(data);
-
-    // Validate and merge with defaults using Zod
-    const validatedSettings = SettingsSchema.parse({
-      ...DEFAULT_SETTINGS,
-      ...parsed,
+    await fs.writeFile(file, JSON.stringify(DEFAULT_SETTINGS, null, 2), {
+      encoding: "utf-8",
+      flag: "wx", // Only if the file doesn't exist
     });
-
-    return validatedSettings;
-  } catch (error) {
-    // If file doesn't exist or is invalid, return defaults
-    return { ...DEFAULT_SETTINGS };
+    console.log("Settings file created with default values.");
+  } catch (error: any) {
+    if (error.code !== "EEXIST") {
+      throw error;
+    }
   }
+  const parsed = JSON.parse(await fs.readFile(file, "utf-8"));
+  return SettingsSchema.parse({ ...DEFAULT_SETTINGS, ...parsed });
 }
 
 export async function updateSettings(
-  updates: Partial<Settings>
+  updates: Partial<Settings>,
+  file = SETTINGS_FILE
 ): Promise<Settings> {
-  const currentSettings = await getSettings();
-  const newSettings = { ...currentSettings, ...updates };
-
-  // Validate the merged settings
-  const validatedSettings = SettingsSchema.parse(newSettings);
-
-  // Save to file
-  const data = JSON.stringify(validatedSettings, null, 2);
-  await fs.writeFile(SETTINGS_FILE, data, "utf-8");
-
-  return validatedSettings;
+  const newSettings = SettingsSchema.parse({
+    ...(await loadSettings(file)),
+    ...updates,
+  });
+  await fs.writeFile(file, JSON.stringify(newSettings, null, 2), "utf-8");
+  return newSettings;
 }
 
-export const settings$: Observable<Settings> = from(
-  fs.watch(SETTINGS_FILE, { persistent: true })
+/**
+ * Emits the settings now and whenever the file changes. Skips invalid or
+ * half-written files and saves that don't change anything.
+ */
+export const watchSettings = (file: string): Observable<Settings> =>
+  new Observable<void>((subscriber) => {
+    // Watch the folder, as editors often replace the file instead of writing to it
+    const watcher = watch(path.dirname(file), (_event, filename) => {
+      if (filename === path.basename(file)) {
+        subscriber.next();
+      }
+    });
+    watcher.on("error", (error) => subscriber.error(error));
+    return () => watcher.close();
+  }).pipe(
+    // A single save fires several events
+    debounceTime(100),
+    startWith(undefined),
+    switchMap(() =>
+      from(loadSettings(file)).pipe(
+        catchError((error) => {
+          console.error(`Ignoring invalid settings in ${file}:`, error);
+          return EMPTY;
+        })
+      )
+    ),
+    distinctUntilChanged<Settings>(isDeepStrictEqual)
+  );
+
+export const settings$: Observable<Settings> = watchSettings(
+  SETTINGS_FILE
 ).pipe(
-  startWith(null), // Emit initial value
-  switchMap(getSettings),
   shareReplay({
     refCount: true,
     bufferSize: 1,

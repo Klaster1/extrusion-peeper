@@ -5,119 +5,92 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <title>Extrusion Peeper</title>
-    <link rel="stylesheet" href="/node_modules/dseg/css/dseg.css" />
+    <link rel="stylesheet" href="/vendor/dseg/css/dseg.css" />
     <link
       rel="icon"
       href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>👁️</text></svg>"
     />
   </head>
   <body>
-    <script src="/node_modules/rtsp-relay/browser/index.js"></script>
-    <script type="module">
-      loadPlayer({
-        url: "ws://" + location.host + "/api/stream",
-        canvas: document.getElementById("canvas"),
-      });
+    <script type="module" src="/client/page.js"></script>
 
-      const temperatureSocket = new WebSocket(
-        "ws://" + location.host + "/api/temperature"
-      );
-      temperatureSocket.onmessage = (event) => {
-        document.querySelector(".temperature .value").textContent =
-          event.data + " °C";
-      };
+    <video
+      id="video"
+      muted
+      autoplay
+      playsinline
+      disablepictureinpicture
+    ></video>
+    <div class="status">Connecting to camera…</div>
 
-      // Settings
-      new WebSocket(`ws://${location.host}/api/settings`).addEventListener(
-        "message",
-        (event) => {
-          const data = JSON.parse(event.data);
-          const dialog = document.getElementById("dialog-settings");
-          dialog.querySelector("input[name='cameraHost']").value =
-            data.cameraHost || "";
-          dialog.querySelector("input[name='cameraLogin']").value =
-            data.cameraLogin || "";
-        }
-      );
+    <button
+      title="Settings"
+      id="button-settings"
+      class="round-button"
+      type="button"
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path
+          d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
+        />
+      </svg>
+    </button>
 
-      // Sensors
-      new WebSocket(`ws://${location.host}/api/sensors`).addEventListener(
-        "message",
-        (event) => {
-          const data = JSON.parse(event.data);
-          const select = document.querySelector(
-            "select[id='select-temperature-sensor']"
-          );
-          select.innerHTML = "";
-          const emptyOption = document
-            .getElementById("template-temperature-sensor-option")
-            .content.cloneNode(true);
-          emptyOption.querySelector("option").value = "";
-          emptyOption.querySelector("option").textContent = "Select sensor";
-          select.appendChild(emptyOption);
-          for (const sensor of data) {
-            if (sensor.selected) {
-              select.value = sensor.id;
-            }
-            const option = document
-              .getElementById("template-temperature-sensor-option")
-              .content.cloneNode(true);
-            option.querySelector("option").value = sensor.id;
-            option.querySelector("option").textContent =
-              `${sensor.online ? "🟢" : "🔴"} ${sensor.name}`;
-            option.querySelector("option").selected = sensor.selected;
-            select.appendChild(option);
-          }
-        }
-      );
-
-      document
-        .querySelector("button[id='button-settings']")
-        .addEventListener("click", () => {
-          const dialog = document.getElementById("dialog-settings");
-          dialog.showModal();
-        });
-    </script>
-    <canvas id="canvas"></canvas>
-    <button title="Settings" id="button-settings" type="button">⚙️</button>
     <dialog id="dialog-settings">
       <form action="/api/settings" method="post">
-        <label>
-          Temperate sensor:
-          <select id="select-temperature-sensor" name="sensorDeviceId"></select>
-          <template id="template-temperature-sensor-option">
-            <option value=""></option>
-          </template>
-        </label>
-        <fieldset>
-          <legend>Camera</legend>
-          <label>
-            Host:
-            <input
-              type="text"
-              name="cameraHost"
-              placeholder="e.g. 192.168.1.15"
-            />
-          </label>
-          <label>
-            Login:
-            <input type="text" name="cameraLogin" placeholder="e.g. admin" />
-          </label>
-          <label>
-            Password:
-            <input
-              type="password"
-              name="cameraPassword"
-              placeholder="e.g. password"
-            />
-          </label>
-        </fieldset>
-        <button type="submit">Save</button>
+        <header>
+          <h1>Settings</h1>
+          <button type="button" class="close" title="Close" data-close>
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        </header>
+        <div class="content">
+          <section>
+            <h2>Temperature</h2>
+            <label class="row">
+              <span>Sensor</span>
+              <select
+                id="select-temperature-sensor"
+                name="sensorDeviceId"
+              ></select>
+            </label>
+          </section>
+          <section>
+            <h2>Camera</h2>
+            <label class="row">
+              <span>Host</span>
+              <input type="text" name="cameraHost" placeholder="192.168.1.15" />
+            </label>
+            <label class="row">
+              <span>Login</span>
+              <input type="text" name="cameraLogin" placeholder="admin" />
+            </label>
+            <label class="row">
+              <span>Password</span>
+              <input
+                type="password"
+                name="cameraPassword"
+                placeholder="password"
+                autocomplete="current-password"
+              />
+            </label>
+          </section>
+        </div>
+        <footer>
+          <button type="submit" class="primary">Save</button>
+          <button type="button" data-close>Cancel</button>
+        </footer>
       </form>
     </dialog>
+
     <div class="temperature">
-      <span class="background">88.8 °C</span>
-      <span class="value">22.7 °C</span>
+      <span class="label">Chamber</span>
+      <span class="digits">
+        <span class="background">88.8 °C</span>
+        <span class="value">--.- °C</span>
+      </span>
     </div>
     <div class="temperature-notification">
       <label>Notify at</label>
@@ -131,20 +104,206 @@
       <input type="checkbox" />
     </div>
     <style>
+      /* Colors and metrics of Orca Slicer's dark theme */
+      :root {
+        color-scheme: dark;
+        --canvas: #242428;
+        --panel: #2d2d31;
+        --panel-raised: #36363c;
+        --control: #3e3e45;
+        --control-hover: #4a4a52;
+        --border: #4c4c55;
+        --text: #efeff0;
+        --text-muted: #a3a3a8;
+        --text-disabled: #6b6b70;
+        --accent: #009688;
+        --accent-hover: #26a69a;
+        --radius: 4px;
+      }
       body {
         margin: 0;
         padding: 0;
-        background: rgb(54, 54, 60);
+        background: var(--canvas);
+        color: var(--text);
         max-width: 100vw;
         max-height: 100vh;
         overflow: hidden;
-        font-family: sans-serif;
+        font:
+          13px "HarmonyOS Sans SC",
+          "Segoe UI",
+          system-ui,
+          sans-serif;
       }
-      canvas {
+      video {
+        display: block;
         width: 100vw;
         height: 100vh;
         object-fit: contain;
       }
+      .status {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        color: var(--text-muted);
+        font-size: 14px;
+        pointer-events: none;
+      }
+      .playing .status {
+        display: none;
+      }
+
+      svg {
+        width: 18px;
+        height: 18px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+      }
+      button {
+        font: inherit;
+        color: var(--text);
+        background: var(--control);
+        border: 1px solid transparent;
+        border-radius: var(--radius);
+        padding: 5px 20px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: var(--control-hover);
+      }
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: none;
+        border-color: var(--accent);
+      }
+      button.primary {
+        background: var(--accent);
+      }
+      button.primary:hover {
+        background: var(--accent-hover);
+      }
+      .round-button {
+        position: fixed;
+        top: 12px;
+        left: 12px;
+        z-index: 2;
+        display: grid;
+        place-items: center;
+        width: 34px;
+        height: 34px;
+        padding: 0;
+        border-radius: 50%;
+        background: color-mix(in srgb, var(--panel-raised) 85%, transparent);
+        color: var(--text-muted);
+      }
+      .round-button:hover {
+        color: var(--text);
+      }
+
+      dialog {
+        width: min(440px, calc(100vw - 32px));
+        padding: 0;
+        color: var(--text);
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0 8px 24px rgb(0 0 0 / 0.5);
+      }
+      dialog::backdrop {
+        background: rgb(0 0 0 / 0.4);
+      }
+      dialog header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 6px 6px 6px 12px;
+      }
+      dialog h1 {
+        margin: 0;
+        font-size: 13px;
+        font-weight: normal;
+      }
+      dialog .close {
+        display: grid;
+        place-items: center;
+        padding: 4px;
+        background: none;
+        color: var(--text-muted);
+      }
+      dialog .close:hover {
+        color: var(--text);
+        background: var(--control);
+      }
+      dialog .content {
+        padding: 4px 16px 12px;
+      }
+      dialog section + section {
+        margin-top: 12px;
+      }
+      /* Section headings are followed by a rule, like Orca's "Settings" and "Project" */
+      dialog h2 {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 6px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      dialog h2::after {
+        content: "";
+        flex: 1;
+        border-top: 1px solid var(--border);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 220px;
+        align-items: center;
+        gap: 12px;
+        padding: 4px 0 4px 10px;
+      }
+      .row span {
+        color: var(--text-muted);
+      }
+      input,
+      select {
+        box-sizing: border-box;
+        width: 100%;
+        height: 26px;
+        padding: 2px 8px;
+        font: inherit;
+        color: var(--text);
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 2px;
+      }
+      input:hover,
+      select:hover {
+        border-color: var(--accent);
+      }
+      input::placeholder {
+        color: var(--text-disabled);
+      }
+      /* Orca puts the dropdown chevron on the left */
+      select {
+        appearance: none;
+        padding-left: 24px;
+        background: var(--panel)
+          url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M2.5 4.5 6 8l3.5-3.5' fill='none' stroke='%23a3a3a8' stroke-width='1.2'/></svg>")
+          no-repeat 6px center / 12px;
+        cursor: pointer;
+      }
+      dialog footer {
+        display: flex;
+        flex-direction: row-reverse;
+        gap: 8px;
+        padding: 10px 16px;
+        border-top: 1px solid var(--border);
+      }
+
       .temperature-notification {
         display: none;
 
@@ -160,62 +319,41 @@
         }
       }
       .temperature {
-        --lcd-hue: 0;
-        --lcd-saturation: 0%;
-        --lcd-lightness: 22%;
-        --lcd-color-preview: hsl(0, 0%, 22%);
-
-        --lcd-background-color: hsl(
-          var(--lcd-hue),
-          var(--lcd-saturation),
-          calc(var(--lcd-lightness) + 70%)
-        );
-        --lcd-active-segment-color: hsl(
-          var(--lcd-hue),
-          var(--lcd-saturation),
-          calc(var(--lcd-lightness))
-        );
-        --lcd-inactive-segment-color: hsl(
-          var(--lcd-hue),
-          var(--lcd-saturation),
-          calc(var(--lcd-lightness) + 60%)
-        );
-
         position: absolute;
-        right: 25px;
-        bottom: 25px;
-        font-size: 45px;
-        background-color: var(--lcd-background-color);
-        border-radius: 0.33em;
-        padding: 0.33em;
-        font-family: "DSEG7-Classic";
-        font-style: oblique;
+        right: 16px;
+        bottom: 16px;
         display: grid;
-        grid-template-columns: 1fr;
-        box-shadow: 0.11em 0.11em;
+        gap: 2px;
+        padding: 8px 14px 10px;
+        background: color-mix(in srgb, var(--panel) 90%, transparent);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
 
+        .label {
+          color: var(--text-muted);
+          font-weight: 600;
+        }
+        .digits {
+          display: grid;
+          font-size: 40px;
+          font-family: "DSEG7-Classic";
+          font-style: oblique;
+        }
         .value {
-          color: var(--lcd-active-segment-color);
+          color: var(--text);
+        }
+        &.stale .value {
+          color: var(--text-disabled);
         }
         .background {
-          color: var(--lcd-inactive-segment-color);
+          color: color-mix(in srgb, var(--text) 8%, transparent);
         }
         .value,
         .background {
           grid-row: 1;
           grid-column: 1;
+          text-align: right;
         }
-      }
-      button[id="button-settings"] {
-        position: fixed;
-        top: 10px;
-        left: 10px;
-        z-index: 2;
-        font-size: 32px;
-        background: none;
-        border: none;
-        outline: none;
-        cursor: pointer;
       }
     </style>
   </body>
