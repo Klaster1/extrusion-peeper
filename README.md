@@ -19,7 +19,22 @@ Last year I bought my first printer - a P1S - and very quickly discovered how ba
 2. Get a Tplink/Tapo temperature sensor and place it somewhere in the print chamber. To display temp alongside the video stream, you'll need to put your Tapo credentials into settings.
 3. Install Node.js 26.13 or newer and npm 12 (`npm install -g npm@12`), clone this repo, cd into it and run `npm install`, then `npm run start`. npm 12 only runs the install script of `ffmpeg-static`, which downloads FFmpeg. This will create a `settings.json` file - that's where you put the camera and sensor settings.
 4. The app will print "You can now peep at extrusions over at: http://localhost:2024". Navigate to the link. If set up correctly and the camera is online, you'll observe the footage. For the sensor, click on the "Settings" button in the top-left corner, choose a sensor from the dropdown and click "Save".
-5. To use with Orca, go to "Device", click on "Camera settings" in the top-right corner of the video section, enter "http://localhost:2024" (or whatever you have) into the address and press Enter.
+5. To use with Orca Slicer 2.5 or newer, put the peeper into its own tab with the Web Tabs plugin:
+   1. Go to "File" > "Plugins", click "Browse plugins" and install "Web Tabs" by Berten. The plugin catalog needs you to sign in to an Orca Cloud account.
+   2. Run the plugin's "Manage web tabs" action and add a tab titled "Extrusion Peeper" with the URL "http://localhost:2024" (or whatever you have). This is saved to the plugin's `tabs.json`:
+
+      ```json
+      [
+        {
+          "title": "Extrusion Peeper",
+          "url": "http://localhost:2024"
+        }
+      ]
+      ```
+
+   3. Reload the plugin in the Plugins dialog or restart Orca, and the "Extrusion Peeper" tab appears next to "Device".
+
+   On older Orca versions, go to "Device", click on "Camera settings" in the top-right corner of the video section, enter "http://localhost:2024" into the address and press Enter.
 6. Bonus: put the peeper into OS startup apps. It passes the camera video through without re-encoding, so it barely uses any CPU, and only while the web page is open.
 
 # Compatibility
@@ -39,7 +54,7 @@ The camera has to send H.264 video, which is passed to the page as is.
 
 ## Slicer
 
-1. Orca Slicer - works on Windows. The page plays the video with Media Source Extensions, which Linux builds of Orca only support when the system has an H.264 GStreamer decoder, such as `gstreamer1.0-libav` on Debian and Ubuntu. Not tested on Linux or macOS yet.
+1. Orca Slicer - works on Windows, in a Web Tabs tab on 2.5 or in the Device tab before that. The page plays the video with Media Source Extensions, which Linux builds of Orca only support when the system has an H.264 GStreamer decoder, such as `gstreamer1.0-libav` on Debian and Ubuntu. Not tested on Linux or macOS yet.
 2. Bambu Studio - not compatible, there's no setting to set camera stream page URL.
 
 # Contributions
