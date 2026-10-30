@@ -134,7 +134,14 @@ describe("cameraConfigChanges", () => {
     cameraConfigChanges(settings$).subscribe((value) => emitted.push(value));
 
     settings$.next(settings({}));
-    settings$.next(settings({ port: 1234, temperatureSensorDeviceId: "x" }));
+    settings$.next(
+      settings({
+        port: 1234,
+        sensors: [
+          { deviceId: "x", display: "humidity", label: "", icon: "none" },
+        ],
+      })
+    );
     settings$.next(settings({ cameraHost: "192.168.1.16" }));
 
     assert.equal(emitted.length, 2);

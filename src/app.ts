@@ -15,13 +15,13 @@ import type { Settings } from "./settings.ts";
 import type { StreamClient } from "./camera.ts";
 import {
   SettingsFormSchema,
-  type CameraSettingsMessage,
+  type SettingsMessage,
   type SocketMessages,
 } from "./protocol.ts";
 
 export type AppDependencies = {
   settings$: Observable<Settings>;
-  temperature$: Observable<SocketMessages["/api/temperature"]>;
+  sensorReadings$: Observable<SocketMessages["/api/readings"]>;
   sensorOptions$: Observable<SocketMessages["/api/sensors"]>;
   cameraRelay: { connect(client: StreamClient & Pick<WebSocket, "on">): void };
   updateSettings: (updates: Partial<Settings>) => Promise<unknown>;
@@ -45,7 +45,7 @@ const ROOT = join(import.meta.dirname, "..");
 
 export const createApp = ({
   settings$,
-  temperature$,
+  sensorReadings$,
   sensorOptions$,
   cameraRelay,
   updateSettings,
@@ -67,7 +67,7 @@ export const createApp = ({
       if (!form.success) {
         return res.status(400).send(z.prettifyError(form.error));
       }
-      const { sensorDeviceId, cameraHost, cameraLogin, cameraPassword } =
+      const { sensors, cameraHost, cameraLogin, cameraPassword, cameraFit } =
         form.data;
       const cameraSettings: Partial<Settings> =
         cameraHost && cameraLogin && cameraPassword
@@ -75,7 +75,8 @@ export const createApp = ({
           : {};
       try {
         await updateSettings({
-          temperatureSensorDeviceId: sensorDeviceId,
+          sensors,
+          cameraFit,
           ...cameraSettings,
         });
       } catch (error) {
@@ -90,13 +91,15 @@ export const createApp = ({
   const jsonRoutes: {
     [Path in keyof SocketMessages]: Observable<SocketMessages[Path]>;
   } = {
-    "/api/temperature": temperature$,
+    "/api/readings": sensorReadings$,
     "/api/sensors": sensorOptions$,
     "/api/settings": settings$.pipe(
       map(
-        (settings): CameraSettingsMessage => ({
+        (settings): SettingsMessage => ({
           cameraHost: settings.cameraHost,
           cameraLogin: settings.cameraLogin,
+          cameraFit: settings.cameraFit,
+          sensors: settings.sensors,
         })
       )
     ),

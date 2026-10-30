@@ -5,7 +5,7 @@ Your printer camera shoots at 0.3fps 1mpx, preventing you from obsessing over ev
 On a more serious note, Extrusion Peeper does two things:
 
 1. Relays RTSP LAN camera stream to a web page that you can plug into Orca Slicer.
-2. Gives an optional overlay with a sensor temp.
+2. Gives an optional overlay with sensor readings: chamber temperature, AMS humidity, or whatever else your sensors measure.
 
 ![Screenshot of how this works](screenshot.png)
 
@@ -16,9 +16,9 @@ Last year I bought my first printer - a P1S - and very quickly discovered how ba
 # How to
 
 1. Get a Tplink/Tapo camera and set it up to stream over LAN. You'll need the camera host (like an IP - 192.168.1.20), camera login, and password.
-2. Get a Tplink/Tapo temperature sensor and place it somewhere in the print chamber. To display temp alongside the video stream, you'll need to put your Tapo credentials into settings.
+2. Get a Tplink/Tapo temperature and humidity sensor and place it somewhere in the print chamber, and another one in the AMS or dry box if you like. To display readings alongside the video stream, you'll need to put your Tapo credentials into settings.
 3. Install Node.js 26.13 or newer and npm 12 (`npm install -g npm@12`), clone this repo, cd into it and run `npm install`, then `npm run start`. npm 12 only runs the install script of `ffmpeg-static`, which downloads FFmpeg. This will create a `settings.json` file - that's where you put the camera and sensor settings.
-4. The app will print "You can now peep at extrusions over at: http://localhost:2024". Navigate to the link. If set up correctly and the camera is online, you'll observe the footage. For the sensor, click on the "Settings" button in the top-left corner, choose a sensor from the dropdown and click "Save".
+4. The app will print "You can now peep at extrusions over at: http://localhost:2024". Navigate to the link. If set up correctly and the camera is online, you'll observe the footage. For the sensors, click on the "Settings" button in the top-left corner and click "Add sensor" for each readout you want. Pick the sensor, whether it shows temperature or humidity, a label and an icon, then click "Save". The same sensor can be added twice to show both. Drag sensors by their handles to reorder the overlay. The "Camera" tab sets how the video fits the page: whole, cropped to fill it, or stretched.
 5. To use with Orca Slicer 2.5 or newer, put the peeper into its own tab with the Web Tabs plugin:
    1. Go to "File" > "Plugins", click "Browse plugins" and install "Web Tabs" by Berten. The plugin catalog needs you to sign in to an Orca Cloud account.
    2. Run the plugin's "Manage web tabs" action and add a tab titled "Extrusion Peeper" with the URL "http://localhost:2024" (or whatever you have). This is saved to the plugin's `tabs.json`:
@@ -61,7 +61,7 @@ The camera has to send H.264 video, which is passed to the page as is.
 
 These are very welcome, it's obvious I didn't pay much attention to how easy to use this is or whether it's compatible with many devices.
 
-Run `npm test` for the tests and `npm run typecheck` to check types.
+Run `npm test` for the tests and `npm run typecheck` to check types. Every change needs tests, see [CLAUDE.md](CLAUDE.md).
 
 # Extras
 

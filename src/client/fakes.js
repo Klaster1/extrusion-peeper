@@ -98,3 +98,64 @@ export const fakeVideo = () => ({
     return Promise.resolve();
   },
 });
+
+/**
+ * Loads the real page markup into a happy-dom window, without running its
+ * scripts, and makes its DOM classes globals like in a browser.
+ */
+export const loadPage = async () => {
+  const { Window } = await import("happy-dom");
+  const { readFile } = await import("fs/promises");
+  const window = new Window({
+    settings: {
+      disableJavaScriptEvaluation: true,
+      disableJavaScriptFileLoading: true,
+      disableCSSFileLoading: true,
+    },
+  });
+  window.document.write(
+    await readFile(new URL("../index.html", import.meta.url), "utf-8")
+  );
+  for (const name of [
+    "document",
+    "Node",
+    "Element",
+    "HTMLElement",
+    "HTMLButtonElement",
+    "HTMLInputElement",
+    "HTMLSelectElement",
+    "HTMLTemplateElement",
+    "SVGSVGElement",
+    "FormData",
+  ]) {
+    globalThis[name] = window[name];
+  }
+  globalThis.window = window;
+  // happy-dom has no Option constructor
+  globalThis.Option = function (text = "", value = text) {
+    const option = window.document.createElement("option");
+    option.textContent = text;
+    option.value = value;
+    return option;
+  };
+  return window;
+};
+
+/**
+ * Dispatches a bubbling event with the given properties, such as `clientY`.
+ *
+ * @param {EventTarget} target
+ * @param {string} type
+ * @param {object} [properties]
+ */
+export const fire = (target, type, properties = {}) => {
+  const event = new globalThis.window.Event(type, {
+    bubbles: true,
+    cancelable: true,
+  });
+  for (const [key, value] of Object.entries(properties)) {
+    Object.defineProperty(event, key, { value });
+  }
+  target.dispatchEvent(event);
+  return event;
+};

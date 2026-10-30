@@ -1,26 +1,12 @@
 import { connectJsonSocket, socketUrl } from "./socket.js";
 import { playStream } from "./video-player.js";
-import {
-  isStale,
-  sensorLabel,
-  temperatureLabel,
-  temperatureText,
-} from "./format.js";
+import { find } from "./dom.js";
+import { OBJECT_FITS } from "./format.js";
+import { showReadouts } from "./readouts.js";
+import { createSensorList } from "./sensor-list.js";
+import { makeTabs } from "./tabs.js";
 
-/**
- * @template {Element} T
- * @param {string} selector
- * @param {new () => T} type
- * @param {ParentNode} [parent]
- * @returns {T}
- */
-const find = (selector, type, parent = document) => {
-  const element = parent.querySelector(selector);
-  if (!(element instanceof type)) {
-    throw new Error(`Missing ${type.name} ${selector}`);
-  }
-  return element;
-};
+/** @typedef {import("../protocol.ts").SettingsMessage} SettingsMessage */
 
 // Video
 const video = find("#video", HTMLVideoElement);
@@ -32,44 +18,52 @@ video.addEventListener("waiting", () => {
 });
 playStream(video, socketUrl("/api/stream"));
 
-// Temperature
-const temperature = find(".temperature", HTMLElement);
-connectJsonSocket("/api/temperature", (reading) => {
-  find(".value", HTMLElement, temperature).textContent =
-    temperatureText(reading);
-  find(".label", HTMLElement, temperature).textContent =
-    temperatureLabel(reading);
-  temperature.classList.toggle("stale", isStale(reading));
-});
+// Readouts
+const readouts = find(".readouts", HTMLElement);
+const readoutTemplate = find("#template-readout", HTMLTemplateElement);
+connectJsonSocket("/api/readings", (readings) =>
+  showReadouts(readouts, readoutTemplate, readings)
+);
 
 // Settings
 const dialog = find("#dialog-settings", HTMLDialogElement);
+const form = find("form", HTMLFormElement, dialog);
+makeTabs(find("[role='tablist']", HTMLElement, dialog), form);
+const sensorList = createSensorList(
+  find("#sensor-list", HTMLElement),
+  find("#template-sensor", HTMLTemplateElement)
+);
+/** @type {SettingsMessage | undefined} */
+let saved;
+
+/** Fills the form with the saved settings, discarding unsaved changes. */
+const showSaved = () => {
+  if (!saved) {
+    return;
+  }
+  find("input[name='cameraHost']", HTMLInputElement, form).value =
+    saved.cameraHost ?? "";
+  find("input[name='cameraLogin']", HTMLInputElement, form).value =
+    saved.cameraLogin ?? "";
+  find("select[name='cameraFit']", HTMLSelectElement, form).value =
+    saved.cameraFit;
+  sensorList.show(saved.sensors);
+};
+
 connectJsonSocket("/api/settings", (settings) => {
-  find("input[name='cameraHost']", HTMLInputElement, dialog).value =
-    settings.cameraHost ?? "";
-  find("input[name='cameraLogin']", HTMLInputElement, dialog).value =
-    settings.cameraLogin ?? "";
+  saved = settings;
+  video.style.objectFit = OBJECT_FITS[settings.cameraFit];
+  if (!dialog.open) {
+    showSaved();
+  }
 });
+connectJsonSocket("/api/sensors", (sensors) => sensorList.setOptions(sensors));
 
-// Sensors
-const sensorSelect = find("#select-temperature-sensor", HTMLSelectElement);
-/**
- * @param {string} value
- * @param {string} label
- * @param {boolean} [selected]
- */
-const makeOption = (value, label, selected = false) =>
-  new Option(label, value, selected, selected);
-connectJsonSocket("/api/sensors", (sensors) => {
-  sensorSelect.replaceChildren(
-    makeOption("", "Select sensor"),
-    ...sensors.map((sensor) =>
-      makeOption(sensor.id, sensorLabel(sensor), sensor.selected)
-    )
-  );
-});
-
+find("#button-add-sensor", HTMLButtonElement).addEventListener("click", () =>
+  sensorList.add()
+);
 find("#button-settings", HTMLButtonElement).addEventListener("click", () => {
+  showSaved();
   dialog.showModal();
 });
 for (const button of dialog.querySelectorAll("[data-close]")) {

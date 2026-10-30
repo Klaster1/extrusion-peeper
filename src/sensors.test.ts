@@ -11,14 +11,14 @@ import {
 import {
   createSensorReader,
   pollSensors,
-  selectedReading,
   sensorOptions,
-  toTemperatureSensors,
+  sensorReadings,
+  toSensors,
   type HubSession,
-  type TemperatureSensor,
+  type Sensor,
 } from "./sensors.ts";
 import type { TapoSensorDevice } from "./tapo-api.ts";
-import type { SensorOption, TemperatureReading } from "./protocol.ts";
+import type { SensorOption, SensorReading, SensorSetting } from "./protocol.ts";
 
 const sensor = (
   id: string,
@@ -118,100 +118,176 @@ describe("pollSensors", () => {
   });
 });
 
-describe("toTemperatureSensors", () => {
-  it("decodes names and follows the selected sensor as it changes", () => {
-    const selectedId$ = new BehaviorSubject<string | null>("a");
-    const emitted: TemperatureSensor[][] = [];
-    toTemperatureSensors(
+describe("toSensors", () => {
+  it("decodes names and reads temperature and humidity", () => {
+    const emitted: Sensor[][] = [];
+    toSensors(
       of([
-        sensor("a", { at_low_battery: false }),
-        sensor("b", { status: "offline", at_low_battery: true }),
-      ]),
-      selectedId$
+        sensor("a", { at_low_battery: false, current_humidity: 40 }),
+        sensor("b", {
+          status: "offline",
+          at_low_battery: true,
+          current_temp: undefined,
+        }),
+      ])
     ).subscribe((sensors) => emitted.push(sensors));
 
-    selectedId$.next("b");
-
-    assert.deepEqual(emitted[0], [
-      {
-        id: "a",
-        name: "Sensor a",
-        temperature: 25,
-        online: true,
-        lowBattery: false,
-        selected: true,
-      },
-      {
-        id: "b",
-        name: "Sensor b",
-        temperature: 25,
-        online: false,
-        lowBattery: true,
-        selected: false,
-      },
-    ]);
-    assert.deepEqual(
-      emitted[1].map((s) => s.selected),
-      [false, true]
-    );
-  });
-
-  it("reports a sensor without a reading as null", () => {
-    const emitted: TemperatureSensor[][] = [];
-    toTemperatureSensors(
-      of([sensor("a", { current_temp: undefined })]),
-      of("a")
-    ).subscribe((sensors) => emitted.push(sensors));
-
-    assert.equal(emitted[0][0].temperature, null);
-  });
-});
-
-describe("selectedReading and sensorOptions", () => {
-  const reading = (
-    temperature: number,
-    { selected = true, online = true } = {}
-  ): TemperatureSensor[] => [
-    { id: "a", name: "A", online, lowBattery: false, selected, temperature },
-  ];
-
-  it("emits the selected sensor's reading when it changes", () => {
-    const sensors$ = new Subject<TemperatureSensor[]>();
-    const emitted: (TemperatureReading | null)[] = [];
-    selectedReading(sensors$).subscribe((r) => emitted.push(r));
-
-    sensors$.next(reading(25));
-    sensors$.next(reading(25));
-    sensors$.next(reading(25, { online: false }));
-    sensors$.next(reading(26, { selected: false }));
-
     assert.deepEqual(emitted, [
-      { temperature: 25, online: true, lowBattery: false },
-      { temperature: 25, online: false, lowBattery: false },
-      null,
-    ]);
-  });
-
-  it("emits the options without readings, only when they change", () => {
-    const sensors$ = new Subject<TemperatureSensor[]>();
-    const emitted: SensorOption[][] = [];
-    sensorOptions(sensors$).subscribe((options) => emitted.push(options));
-
-    sensors$.next(reading(25));
-    sensors$.next(reading(26));
-    sensors$.next(reading(26, { selected: false }));
-
-    assert.deepEqual(emitted, [
-      [{ id: "a", name: "A", online: true, lowBattery: false, selected: true }],
       [
         {
           id: "a",
-          name: "A",
+          name: "Sensor a",
+          temperature: 25,
+          humidity: 40,
           online: true,
           lowBattery: false,
-          selected: false,
+        },
+        {
+          id: "b",
+          name: "Sensor b",
+          temperature: null,
+          humidity: null,
+          online: false,
+          lowBattery: true,
         },
       ],
+    ]);
+  });
+});
+
+const chamberSensor: Sensor = {
+  id: "chamber",
+  name: "T310",
+  temperature: 41.2,
+  humidity: 18,
+  online: true,
+  lowBattery: false,
+};
+const amsSensor: Sensor = {
+  id: "ams",
+  name: "T315",
+  temperature: 26,
+  humidity: 12,
+  online: false,
+  lowBattery: true,
+};
+const chamber: SensorSetting = {
+  deviceId: "chamber",
+  display: "temperature",
+  label: "Chamber",
+  icon: "thermometer",
+};
+const ams: SensorSetting = {
+  deviceId: "ams",
+  display: "humidity",
+  label: "AMS",
+  icon: "spool",
+};
+
+describe("sensorReadings", () => {
+  it("shows what each sensor is set to display, in the settings order", () => {
+    const emitted: SensorReading[][] = [];
+    sensorReadings(
+      of([chamberSensor, amsSensor]),
+      of([ams, chamber])
+    ).subscribe((readings) => emitted.push(readings));
+
+    assert.deepEqual(emitted, [
+      [
+        {
+          display: "humidity",
+          label: "AMS",
+          icon: "spool",
+          value: 12,
+          online: false,
+          lowBattery: true,
+        },
+        {
+          display: "temperature",
+          label: "Chamber",
+          icon: "thermometer",
+          value: 41.2,
+          online: true,
+          lowBattery: false,
+        },
+      ],
+    ]);
+  });
+
+  it("can show both readings of one sensor", () => {
+    const emitted: SensorReading[][] = [];
+    sensorReadings(
+      of([chamberSensor]),
+      of([chamber, { ...chamber, display: "humidity" }])
+    ).subscribe((readings) => emitted.push(readings));
+
+    assert.deepEqual(
+      emitted[0].map((reading) => reading.value),
+      [41.2, 18]
+    );
+  });
+
+  it("labels a sensor with its name when the label is empty", () => {
+    const emitted: SensorReading[][] = [];
+    sensorReadings(of([amsSensor]), of([{ ...ams, label: "" }])).subscribe(
+      (readings) => emitted.push(readings)
+    );
+
+    assert.equal(emitted[0][0].label, "T315");
+  });
+
+  it("shows no value for a sensor the hubs don't list", () => {
+    const emitted: SensorReading[][] = [];
+    sensorReadings(of([]), of([{ ...ams, label: "" }])).subscribe((readings) =>
+      emitted.push(readings)
+    );
+
+    assert.deepEqual(emitted[0], [
+      {
+        display: "humidity",
+        label: "",
+        icon: "spool",
+        value: null,
+        online: true,
+        lowBattery: false,
+      },
+    ]);
+  });
+
+  it("emits when the readings or settings change, but not for the same readings", () => {
+    const sensors$ = new Subject<Sensor[]>();
+    const settings$ = new BehaviorSubject<SensorSetting[]>([chamber]);
+    const emitted: SensorReading[][] = [];
+    sensorReadings(sensors$, settings$).subscribe((readings) =>
+      emitted.push(readings)
+    );
+
+    sensors$.next([chamberSensor]);
+    sensors$.next([chamberSensor, amsSensor]);
+    sensors$.next([{ ...chamberSensor, temperature: 42 }]);
+    settings$.next([chamber, ams]);
+    settings$.next([]);
+
+    assert.deepEqual(
+      emitted.map((readings) => readings.map((reading) => reading.value)),
+      [[41.2], [42], [42, null], []]
+    );
+  });
+});
+
+describe("sensorOptions", () => {
+  it("emits the options without readings, only when they change", () => {
+    const sensors$ = new Subject<Sensor[]>();
+    const emitted: SensorOption[][] = [];
+    sensorOptions(sensors$).subscribe((options) => emitted.push(options));
+
+    sensors$.next([chamberSensor]);
+    sensors$.next([{ ...chamberSensor, temperature: 50, humidity: 5 }]);
+    sensors$.next([{ ...chamberSensor, online: false }]);
+
+    assert.deepEqual(emitted, [
+      [{ id: "chamber", name: "T310", online: true, lowBattery: false }],
+      [{ id: "chamber", name: "T310", online: false, lowBattery: false }],
     ]);
   });
 });

@@ -13,6 +13,11 @@ import {
   switchMap,
 } from "rxjs";
 import * as z from "zod/v4";
+import {
+  CAMERA_FITS,
+  SensorSettingSchema,
+  type SensorSetting,
+} from "./protocol.ts";
 
 const SettingsSchema = z.object({
   $schema: z.string().default("./settings.schema.json"),
@@ -21,7 +26,8 @@ const SettingsSchema = z.object({
   cameraHost: z.string().nullable(),
   cameraLogin: z.string().nullable(),
   cameraPassword: z.string().nullable(),
-  temperatureSensorDeviceId: z.string().nullable(),
+  cameraFit: z.enum(CAMERA_FITS),
+  sensors: z.array(SensorSettingSchema),
   port: z.number().nullable(),
 });
 
@@ -34,8 +40,26 @@ export const DEFAULT_SETTINGS: Settings = {
   cameraHost: null,
   cameraLogin: null,
   cameraPassword: null,
-  temperatureSensorDeviceId: null,
+  cameraFit: "fit",
+  sensors: [],
   port: 2024,
+};
+
+/** Settings from before there could be several sensors had one chamber temperature sensor. */
+const migrate = ({
+  temperatureSensorDeviceId,
+  ...settings
+}: Record<string, unknown>) => {
+  if (settings.sensors || typeof temperatureSensorDeviceId !== "string") {
+    return settings;
+  }
+  const chamber: SensorSetting = {
+    deviceId: temperatureSensorDeviceId,
+    display: "temperature",
+    label: "Chamber",
+    icon: "thermometer",
+  };
+  return { ...settings, sensors: [chamber] };
 };
 
 const SETTINGS_FILE = path.join(import.meta.dirname, "..", "settings.json");
@@ -54,7 +78,7 @@ export async function loadSettings(file = SETTINGS_FILE): Promise<Settings> {
     }
   }
   const parsed = JSON.parse(await fs.readFile(file, "utf-8"));
-  return SettingsSchema.parse({ ...DEFAULT_SETTINGS, ...parsed });
+  return SettingsSchema.parse({ ...DEFAULT_SETTINGS, ...migrate(parsed) });
 }
 
 export async function updateSettings(

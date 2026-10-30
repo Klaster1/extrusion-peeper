@@ -1,11 +1,11 @@
 import { settings$, updateSettings } from "./settings.ts";
-import { sensorOptions$, temperature$ } from "./temperature.ts";
+import { sensorOptions$, sensorReadings$ } from "./tapo.ts";
 import { cameraConfigChanges, createCameraRelay } from "./camera.ts";
 import { createApp, serveOnPort } from "./app.ts";
 
 const { listen } = createApp({
   settings$,
-  temperature$,
+  sensorReadings$,
   sensorOptions$,
   cameraRelay: createCameraRelay(cameraConfigChanges(settings$)),
   updateSettings,

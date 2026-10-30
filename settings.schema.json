@@ -61,16 +61,46 @@
       ],
       "description": "The password for your camera. Without this, the camera will not work."
     },
-    "temperatureSensorDeviceId": {
-      "anyOf": [
-        {
-          "type": "string"
+    "cameraFit": {
+      "enum": ["fit", "fill", "stretch"],
+      "default": "fit",
+      "description": "How the video fits the page: \"fit\" shows all of it, \"fill\" crops it to fill the page, \"stretch\" distorts it to fill the page."
+    },
+    "sensors": {
+      "type": "array",
+      "description": "The readouts on the overlay, in order. Filled automatically when you set up sensors in UI.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string",
+            "minLength": 1,
+            "description": "The ID of the Tapo sensor device."
+          },
+          "display": {
+            "enum": ["temperature", "humidity"],
+            "description": "Which of the sensor's readings to show."
+          },
+          "label": {
+            "type": "string",
+            "description": "The caption above the reading. Empty shows the sensor's name."
+          },
+          "icon": {
+            "enum": [
+              "thermometer",
+              "droplet",
+              "chamber",
+              "ams",
+              "printer",
+              "spool",
+              "none"
+            ],
+            "description": "The icon next to the caption."
+          }
         },
-        {
-          "type": "null"
-        }
-      ],
-      "description": "The ID of the temperature sensor device. Filled automatically when you select a sensor in UI."
+        "required": ["deviceId", "display", "label", "icon"],
+        "additionalProperties": false
+      }
     },
     "port": {
       "anyOf": [
@@ -90,8 +120,7 @@
     "password",
     "cameraHost",
     "cameraLogin",
-    "cameraPassword",
-    "temperatureSensorDeviceId"
+    "cameraPassword"
   ],
   "additionalProperties": false
 }

@@ -6,10 +6,12 @@ import {
   retry,
   shareReplay,
   skip,
+  startWith,
   switchMap,
   take,
   throwError,
 } from "rxjs";
+import { isDeepStrictEqual } from "util";
 import {
   refreshTapoToken,
   tapoFullCredentials$,
@@ -21,10 +23,11 @@ import { settings$ } from "./settings.ts";
 import {
   createSensorReader,
   pollSensors,
-  selectedReading,
   sensorOptions,
-  toTemperatureSensors,
+  sensorReadings,
+  toSensors,
 } from "./sensors.ts";
+import type { SensorSetting } from "./protocol.ts";
 
 const listDevices$ = tapoToken$.pipe(
   take(1),
@@ -52,20 +55,16 @@ const connectHubs = async (credentials: TapoCredentials) => {
   );
 };
 
-const currentTemperatureSensorDeviceId$ = settings$.pipe(
-  map((settings) => settings.temperatureSensorDeviceId),
-  distinctUntilChanged()
-);
-
-const temperatureSensors$ = toTemperatureSensors(
+const sensors$ = toSensors(
   tapoFullCredentials$.pipe(
     switchMap((credentials) =>
       credentials
         ? pollSensors(createSensorReader(() => connectHubs(credentials)))
         : of([])
-    )
-  ),
-  currentTemperatureSensorDeviceId$
+    ),
+    // Shows the readouts with dashes until the first read
+    startWith([])
+  )
 ).pipe(
   shareReplay({
     refCount: true,
@@ -73,6 +72,12 @@ const temperatureSensors$ = toTemperatureSensors(
   })
 );
 
-export const temperature$ = selectedReading(temperatureSensors$);
+export const sensorReadings$ = sensorReadings(
+  sensors$,
+  settings$.pipe(
+    map((settings) => settings.sensors),
+    distinctUntilChanged<SensorSetting[]>(isDeepStrictEqual)
+  )
+);
 
-export const sensorOptions$ = sensorOptions(temperatureSensors$);
+export const sensorOptions$ = sensorOptions(sensors$);

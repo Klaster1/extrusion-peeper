@@ -4,7 +4,11 @@ import type { AddressInfo } from "net";
 import { BehaviorSubject, Subject } from "rxjs";
 import { createApp, serveOnPort, type AppDependencies } from "./app.ts";
 import { DEFAULT_SETTINGS, type Settings } from "./settings.ts";
-import type { SocketMessages, TemperatureReading } from "./protocol.ts";
+import type {
+  SensorReading,
+  SensorSetting,
+  SocketMessages,
+} from "./protocol.ts";
 import { waitFor } from "./test-helpers.ts";
 
 const openSocket = async (url: string) => {
@@ -18,13 +22,27 @@ const openSocket = async (url: string) => {
   return { socket, messages };
 };
 
+const chamber: SensorSetting = {
+  deviceId: "chamber",
+  display: "temperature",
+  label: "Chamber",
+  icon: "thermometer",
+};
+const ams: SensorSetting = {
+  deviceId: "ams",
+  display: "humidity",
+  label: "AMS",
+  icon: "spool",
+};
+
 describe("createApp", () => {
-  const temperature$ = new Subject<TemperatureReading | null>();
+  const sensorReadings$ = new Subject<SensorReading[]>();
   const sensorOptions$ = new Subject<SocketMessages["/api/sensors"]>();
   const settings$ = new BehaviorSubject<Settings>({
     ...DEFAULT_SETTINGS,
     cameraHost: "192.168.1.15",
     cameraPassword: "secret",
+    sensors: [chamber],
   });
   const connect = mock.fn((client: { close(): void }) => client.close());
   const updateSettings = mock.fn<AppDependencies["updateSettings"]>(
@@ -36,7 +54,7 @@ describe("createApp", () => {
   before(async () => {
     const { listen } = createApp({
       settings$,
-      temperature$,
+      sensorReadings$,
       sensorOptions$,
       cameraRelay: { connect },
       updateSettings,
@@ -50,27 +68,31 @@ describe("createApp", () => {
   after(() => close());
 
   it("stops sending updates once the socket closes", async () => {
-    const { socket, messages } = await openSocket(
-      `ws://${base}/api/temperature`
-    );
-    await waitFor(() => temperature$.observed);
+    const reading: SensorReading = {
+      display: "humidity",
+      label: "AMS",
+      icon: "spool",
+      value: 12,
+      online: false,
+      lowBattery: true,
+    };
+    const { socket, messages } = await openSocket(`ws://${base}/api/readings`);
+    await waitFor(() => sensorReadings$.observed);
 
-    temperature$.next({ temperature: 25.5, online: false, lowBattery: true });
-    temperature$.next(null);
+    sensorReadings$.next([reading]);
+    sensorReadings$.next([]);
     await waitFor(() => messages.length === 2);
     socket.close();
 
-    await waitFor(() => !temperature$.observed);
+    await waitFor(() => !sensorReadings$.observed);
     assert.deepEqual(
       messages.map((message) => JSON.parse(message)),
-      [{ temperature: 25.5, online: false, lowBattery: true }, null]
+      [[reading], []]
     );
   });
 
   it("sends the sensor options", async () => {
-    const options = [
-      { id: "a", name: "A", online: true, lowBattery: false, selected: true },
-    ];
+    const options = [{ id: "a", name: "A", online: true, lowBattery: false }];
     const { socket, messages } = await openSocket(`ws://${base}/api/sensors`);
     await waitFor(() => sensorOptions$.observed);
 
@@ -81,7 +103,7 @@ describe("createApp", () => {
     assert.deepEqual(JSON.parse(messages[0]), options);
   });
 
-  it("sends the camera host and login, but not the password", async () => {
+  it("sends the camera host, login and fit and the sensors, but not the password", async () => {
     const { socket, messages } = await openSocket(`ws://${base}/api/settings`);
     await waitFor(() => messages.length === 1);
     socket.close();
@@ -89,6 +111,8 @@ describe("createApp", () => {
     assert.deepEqual(JSON.parse(messages[0]), {
       cameraHost: "192.168.1.15",
       cameraLogin: null,
+      cameraFit: "fit",
+      sensors: [chamber],
     });
   });
 
@@ -114,34 +138,68 @@ describe("createApp", () => {
     assert.equal(other.status, 404);
   });
 
-  it("saves the settings and redirects home", async () => {
-    const response = await fetch(`http://${base}/api/settings`, {
+  const sensorForm = (...sensors: SensorSetting[]) =>
+    sensors.flatMap((sensor) => [
+      ["sensorDeviceId", sensor.deviceId],
+      ["sensorDisplay", sensor.display],
+      ["sensorLabel", sensor.label],
+      ["sensorIcon", sensor.icon],
+    ]);
+  /** Posts the form as the dialog does, which always has a camera fit. */
+  const postSettings = (
+    fields: string[][],
+    { cameraFit = "fit" }: { cameraFit?: string | null } = {}
+  ) =>
+    fetch(`http://${base}/api/settings`, {
       method: "POST",
-      body: new URLSearchParams({ sensorDeviceId: "sensor", cameraHost: "" }),
+      body: new URLSearchParams([
+        ...fields,
+        ...(cameraFit === null ? [] : [["cameraFit", cameraFit]]),
+      ]),
       redirect: "manual",
     });
 
+  it("saves the settings and redirects home", async () => {
+    const response = await postSettings([
+      ...sensorForm(chamber),
+      ["cameraHost", ""],
+    ]);
+
     assert.equal(response.status, 302);
     assert.deepEqual(updateSettings.mock.calls.at(-1)!.arguments, [
-      { temperatureSensorDeviceId: "sensor" },
+      { sensors: [chamber], cameraFit: "fit" },
+    ]);
+  });
+
+  it("saves every sensor in the form's order, trimming labels", async () => {
+    await postSettings(sensorForm(ams, { ...chamber, label: "  Chamber " }));
+
+    assert.deepEqual(updateSettings.mock.calls.at(-1)!.arguments, [
+      { sensors: [ams, chamber], cameraFit: "fit" },
+    ]);
+  });
+
+  it("saves no sensors when they were all removed", async () => {
+    const response = await postSettings([["cameraHost", ""]]);
+
+    assert.equal(response.status, 302);
+    assert.deepEqual(updateSettings.mock.calls.at(-1)!.arguments, [
+      { sensors: [], cameraFit: "fit" },
     ]);
   });
 
   it("saves the camera only when host, login and password are all given", async () => {
-    await fetch(`http://${base}/api/settings`, {
-      method: "POST",
-      body: new URLSearchParams({
-        sensorDeviceId: "sensor",
-        cameraHost: "192.168.1.16",
-        cameraLogin: "admin",
-        cameraPassword: "secret",
-      }),
-      redirect: "manual",
-    });
+    await postSettings([
+      ...sensorForm(chamber),
+      ["cameraHost", "192.168.1.16"],
+      ["cameraLogin", "admin"],
+      ["cameraPassword", "secret"],
+    ]);
 
     assert.deepEqual(updateSettings.mock.calls.at(-1)!.arguments, [
       {
-        temperatureSensorDeviceId: "sensor",
+        sensors: [chamber],
+        cameraFit: "fit",
         cameraHost: "192.168.1.16",
         cameraLogin: "admin",
         cameraPassword: "secret",
@@ -149,16 +207,48 @@ describe("createApp", () => {
     ]);
   });
 
-  it("rejects a form without a sensor", async () => {
+  it("saves the camera fit", async () => {
+    await postSettings(sensorForm(chamber), { cameraFit: "fill" });
+
+    assert.deepEqual(updateSettings.mock.calls.at(-1)!.arguments, [
+      { sensors: [chamber], cameraFit: "fill" },
+    ]);
+  });
+
+  it("rejects an unknown or missing camera fit", async () => {
     const calls = updateSettings.mock.callCount();
 
-    const response = await fetch(`http://${base}/api/settings`, {
-      method: "POST",
-      body: new URLSearchParams({ cameraHost: "192.168.1.16" }),
-    });
+    const unknown = await postSettings([], { cameraFit: "zoom" });
+    const missing = await postSettings([], { cameraFit: null });
+
+    assert.equal(unknown.status, 400);
+    assert.equal(missing.status, 400);
+    assert.equal(updateSettings.mock.callCount(), calls);
+  });
+
+  it("rejects a sensor without a device", async () => {
+    const calls = updateSettings.mock.callCount();
+
+    const response = await postSettings(
+      sensorForm(chamber, { ...ams, deviceId: "" })
+    );
 
     assert.equal(response.status, 400);
-    assert.match(await response.text(), /Sensor ID is required/);
+    assert.match(await response.text(), /Choose a device for every sensor/);
+    assert.equal(updateSettings.mock.callCount(), calls);
+  });
+
+  it("rejects unknown displays and icons, and sensors missing a field", async () => {
+    const calls = updateSettings.mock.callCount();
+    const forms = [
+      sensorForm({ ...ams, display: "pressure" as any }),
+      sensorForm({ ...ams, icon: "skull" as any }),
+      sensorForm(ams).filter(([name]) => name !== "sensorLabel"),
+    ];
+
+    for (const form of forms) {
+      assert.equal((await postSettings(form)).status, 400);
+    }
     assert.equal(updateSettings.mock.callCount(), calls);
   });
 
@@ -168,10 +258,7 @@ describe("createApp", () => {
       throw new Error("Disk full");
     });
 
-    const response = await fetch(`http://${base}/api/settings`, {
-      method: "POST",
-      body: new URLSearchParams({ sensorDeviceId: "sensor" }),
-    });
+    const response = await postSettings(sensorForm(chamber));
 
     assert.equal(response.status, 500);
   });
@@ -181,7 +268,7 @@ describe("listen", () => {
   it("closes open WebSockets when the server closes", async () => {
     const { listen } = createApp({
       settings$: new Subject(),
-      temperature$: new Subject(),
+      sensorReadings$: new Subject(),
       sensorOptions$: new Subject(),
       cameraRelay: { connect: () => {} },
       updateSettings: async () => {},
